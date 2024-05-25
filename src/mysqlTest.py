@@ -24,7 +24,7 @@ def load_dataset(start: float, path: str, mysql_config: dict) -> float:
     rows = []
     logger.info(f"reading csv. elapsed={time.time() - start}")
     start = time.time()
-    with open(path, "r") as f:
+    with open(path, 'r', encoding="utf-8") as f:
         reader = csv.reader(f, delimiter=";")
         for row in reader:
             rows.append((row[0], float(row[1])))
@@ -44,7 +44,7 @@ def load_dataset(start: float, path: str, mysql_config: dict) -> float:
     logger.info(f"dumping output. elapsed={time.time() - start}")
     start = time.time()
     # Insert data using executemany
-    cursor.executemany("INSERT INTO dataset VALUES(?, ?)", rows)
+    cursor.executemany("INSERT INTO dataset VALUES(%s, %s)", rows)
     connection.commit()
 
     connection.close()
@@ -86,11 +86,17 @@ def process_dataset(start: float, mysql_config: dict) -> float:
     connection.close()
 
     # Create Polars DataFrame from fetched data
-    df = pl.DataFrame(data, columns=["location", "temperature_mean", "temperature_max", "temperature_min"])
+    with open("result_mysql.txt", 'w', encoding="utf-8") as f:
+        # Write column headers
+        f.write("location,temperature_mean,temperature_max,temperature_min\n")
+
+        # Write each row of data
+        for row in data:
+            # Join elements in each row with a comma separator
+            f.write(",".join(str(element) for element in row) + "\n")
 
     logger.info(f"dumping output. elapsed: {time.time() - start}")
     start = time.time()
-    df.write_parquet("result_mysql.parquet")
     return start
 
 
@@ -104,7 +110,8 @@ mysql_config = {
 
 # Assuming load_dataset is called first
 start_time = time.time()
-start_time = load_dataset(start_time, "your_data.csv", mysql_config)
+start_time = load_dataset(start_time, "measurements.csv", mysql_config)
+print(f"Start processing time: {time.time() }" )
 process_dataset(start_time, mysql_config)
-
+print(f"End processing time: {time.time() }" )
 print(f"Total processing time: {time.time() - start_time:.2f} seconds")
